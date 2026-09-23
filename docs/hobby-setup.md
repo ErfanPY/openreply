@@ -92,21 +92,61 @@ Without a valid Resend key and verified sender, magic-link login will fail.
 
 **Current local state (check `.env`):** `RESEND_API_KEY` may already be set, but `EMAIL_FROM` and `ALLOWED_EMAILS` must be real values (not `login@example.com` / `your@email.com`). `NEXTAUTH_URL` must be your ngrok HTTPS URL before Zernio webhooks will work.
 
-## 3. HTTPS tunnel (ngrok) — user action required
+## 3. HTTPS tunnel (ngrok) — required for inbound DMs
 
-ngrok is installed via Scoop (`ngrok version` → 3.x). You still need a free account and authtoken:
+Zernio sends webhooks to `NEXTAUTH_URL/api/zernio/webhook/{workspaceId}`. If `NEXTAUTH_URL` is `http://localhost:3000`, **Instagram DMs will never arrive** — Zernio cannot reach your machine.
 
-1. Sign up at [ngrok.com](https://ngrok.com) and copy your authtoken from the dashboard.
-2. Run once: `ngrok config add-authtoken YOUR_TOKEN`
-3. Start the tunnel:
+### Step A — ngrok account (one time)
+
+1. Sign up: https://dashboard.ngrok.com/signup
+2. Copy authtoken: https://dashboard.ngrok.com/get-started/your-authtoken
+3. Run:
+   ```powershell
+   ngrok config add-authtoken YOUR_TOKEN_HERE
+   ```
+
+### Step B — start tunnel (every session)
+
+Terminal 3 (keep running):
 
 ```powershell
 ngrok http 3000
 ```
 
-4. Copy the `https://....ngrok-free.app` URL into `NEXTAUTH_URL` in `.env`, then restart dev + worker.
+Copy the **Forwarding** HTTPS URL, e.g. `https://abc123.ngrok-free.app` (no trailing slash).
 
-Alternative: [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) if you prefer not to use ngrok.
+### Step C — update `.env` and restart
+
+```env
+NEXTAUTH_URL=https://abc123.ngrok-free.app
+```
+
+Restart **both** processes:
+
+```powershell
+# Terminal 1
+npm run dev
+
+# Terminal 2
+npm run worker
+```
+
+### Step D — re-register Zernio webhook (critical)
+
+OpenReply registered the webhook when `NEXTAUTH_URL` was still localhost. After changing the URL:
+
+1. Open OpenReply at your **ngrok URL** (not localhost) — e.g. `https://abc123.ngrok-free.app`
+2. Sign in → **Settings** → Zernio section
+3. **Re-save your profile selection** (same profile as before) — this updates the webhook URL in Zernio
+4. Confirm `webhookReady` or check ngrok inspector (http://127.0.0.1:4040) for POSTs to `/api/zernio/webhook/...`
+
+### Step E — test again
+
+DM `@yourgrandfatherishere` from another Instagram account → check OpenReply **Inbox**.
+
+**Note:** Free ngrok URLs change every restart. Each time ngrok restarts, repeat steps B–D.
+
+Alternative: [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) for a stable URL.
 
 ## 4. Run processes
 
@@ -153,15 +193,22 @@ If webhooks stop after an ngrok URL change: update `NEXTAUTH_URL`, restart dev +
    - Re-save Zernio connection in Settings
    - Check ngrok request inspector for POSTs to OpenReply webhook routes
 
-## VPS deployment (later)
+## VPS deployment (130.185.76.124)
 
-| Component | Suggested host |
-| --- | --- |
-| Web (`next start` or `npm run dev`) | Vercel, or VPS + nginx + PM2 |
-| Worker (`npm run worker`) | Always-on VPS (Railway, Render, existing VPS) |
-| Postgres + Redis | Managed (Neon + Upstash) or Docker on VPS |
+SSH: `ssh vps` (uses `C:/Users/lenovo/Downloads/private-key-file.pem` as `root`).
 
-Update `NEXTAUTH_URL` to production domain and re-save Zernio connection so webhooks target the new URL.
+```powershell
+cd d:\dev\hobby\openreply
+$env:OPENREPLY_PUBLIC_URL = "http://130.185.76.124:3200"
+.\infra\deploy-vps.ps1
+```
+
+Stack: Docker Compose (`infra/docker-compose.vps.yml`) — postgres, redis, web, worker, cron.
+
+After deploy: sign in at the public URL, **re-save Zernio profile** in Settings, test inbound DM.
+
+**Zernio + Iran:** webhooks may require HTTPS and may not reach all regions — test at `http://130.185.76.124:3200/api/health` and re-save Zernio in Settings after deploy (fresh DB).
+
 
 ## Future phases (not this setup)
 
