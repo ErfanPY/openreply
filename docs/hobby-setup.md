@@ -61,7 +61,7 @@ Set in `.env`:
 
 | Variable | Local value |
 | --- | --- |
-| `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/openreply` |
+| `DATABASE_URL` | `postgresql://postgres@localhost:5432/openreply` (Scoop) or `postgresql://postgres:postgres@localhost:5432/openreply` (Docker) |
 | `REDIS_URL` | `redis://localhost:6379` |
 | `NEXTAUTH_SECRET` | generated |
 | `CRON_SECRET` | generated |
@@ -90,15 +90,23 @@ Set in `.env` (never commit real values):
 
 Without a valid Resend key and verified sender, magic-link login will fail.
 
+**Current local state (check `.env`):** `RESEND_API_KEY` may already be set, but `EMAIL_FROM` and `ALLOWED_EMAILS` must be real values (not `login@example.com` / `your@email.com`). `NEXTAUTH_URL` must be your ngrok HTTPS URL before Zernio webhooks will work.
+
 ## 3. HTTPS tunnel (ngrok) — user action required
 
-ngrok was **not installed** on this machine. Install from [ngrok download](https://ngrok.com/download) or use [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/).
+ngrok is installed via Scoop (`ngrok version` → 3.x). You still need a free account and authtoken:
+
+1. Sign up at [ngrok.com](https://ngrok.com) and copy your authtoken from the dashboard.
+2. Run once: `ngrok config add-authtoken YOUR_TOKEN`
+3. Start the tunnel:
 
 ```powershell
 ngrok http 3000
 ```
 
-Copy the `https://....ngrok-free.app` URL into `NEXTAUTH_URL` in `.env`, then restart dev + worker.
+4. Copy the `https://....ngrok-free.app` URL into `NEXTAUTH_URL` in `.env`, then restart dev + worker.
+
+Alternative: [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) if you prefer not to use ngrok.
 
 ## 4. Run processes
 
