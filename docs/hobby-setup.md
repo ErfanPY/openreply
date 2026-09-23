@@ -28,9 +28,21 @@ Working directory: `d:\dev\hobby\openreply`
 
 ## 1. Infrastructure
 
+**Preferred:** Docker Desktop + `docker compose up -d` (Postgres 16 + Redis 7).
+
+**Fallback (no Docker):** On this machine Docker was not installed. Redis and PostgreSQL were installed via Scoop instead:
+
+```powershell
+scoop install redis postgresql
+pg_ctl -D "$env:USERPROFILE\scoop\persist\postgresql\data" -l "$env:USERPROFILE\scoop\persist\postgresql\logfile" start
+Start-Process redis-server
+psql -U postgres -c "CREATE DATABASE openreply;"
+```
+
+Use `DATABASE_URL=postgresql://postgres@localhost:5432/openreply` (Scoop Postgres uses trust auth, no password).
+
 ```powershell
 cd d:\dev\hobby\openreply
-docker compose up -d
 npm install
 copy .env.example .env
 ```
@@ -66,17 +78,29 @@ npm run db:generate
 npm run db:migrate
 ```
 
-## 2. HTTPS tunnel (ngrok)
+## 2. Resend (magic-link login) — user action required
+
+Set in `.env` (never commit real values):
+
+| Variable | Source |
+| --- | --- |
+| `RESEND_API_KEY` | [Resend dashboard](https://resend.com/api-keys) |
+| `EMAIL_FROM` | Verified domain sender, e.g. `OpenReply <login@yourdomain.com>` |
+| `ALLOWED_EMAILS` | Your email (gh returned no public email for ErfanPY — set manually) |
+
+Without a valid Resend key and verified sender, magic-link login will fail.
+
+## 3. HTTPS tunnel (ngrok) — user action required
+
+ngrok was **not installed** on this machine. Install from [ngrok download](https://ngrok.com/download) or use [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/).
 
 ```powershell
 ngrok http 3000
 ```
 
-Copy the `https://....ngrok-free.app` URL into `NEXTAUTH_URL` in `.env`, then restart the dev server.
+Copy the `https://....ngrok-free.app` URL into `NEXTAUTH_URL` in `.env`, then restart dev + worker.
 
-If ngrok is not installed: [ngrok download](https://ngrok.com/download) or use [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/).
-
-## 3. Run processes
+## 4. Run processes
 
 Terminal 1:
 
@@ -94,13 +118,13 @@ npm run worker
 
 Health check: `GET http://localhost:3000/api/health` — `worker.healthy` must be `true`.
 
-## 4. Sign in
+## 5. Sign in
 
 1. Open `http://localhost:3000` (or your ngrok URL).
 2. Enter an email listed in `ALLOWED_EMAILS`.
 3. Click the magic link from Resend (requires verified domain/sender).
 
-## 5. Connect Zernio (manual — API key not in repo)
+## 6. Connect Zernio (manual — API key not in repo)
 
 1. Sign in as workspace **owner/admin** → **Settings**.
 2. Paste your **new** Zernio API key (unrestricted read/write, **Inbox access**).
@@ -111,7 +135,7 @@ Health check: `GET http://localhost:3000/api/health` — `worker.healthy` must b
 
 If webhooks stop after an ngrok URL change: update `NEXTAUTH_URL`, restart dev + worker, re-save Zernio connection in Settings.
 
-## 6. Test inbound DM
+## 7. Test inbound DM
 
 1. Confirm `/api/health` shows `worker.healthy: true`.
 2. From a **different** Instagram account, DM `@yourgrandfatherishere` (plain text or share a post/reel).
